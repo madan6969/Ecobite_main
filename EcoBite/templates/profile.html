@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EcoBite • Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='CSS/style.css') }}?v=3">
+    <link rel="icon" href="{{ url_for('static', filename='images/hero-image.png') }}">
+</head>
+
+<body>
+    <div class="app">
+        {% include 'shared-sidebar.html' %}
+
+        <main>
+            <div class="header">
+                <div>
+                    <h2>My Profile</h2>
+                    <p>Manage your EcoBite account and impact</p>
+                </div>
+            </div>
+
+            <!-- Profile Header -->
+            <section class="profile-header">
+                <div class="ph-content">
+                    <div class="ph-avatar">
+                        {{ session.get('email', 'G')[0] | upper }}
+                    </div>
+                    <div class="ph-info">
+                        <h3>{{ session.get('email', 'Guest').split('@')[0] | capitalize }}</h3>
+                        <p>{{ session.get('email', 'guest@example.com') }}</p>
+                        <span class="ph-badge">Eco Member</span>
+                    </div>
+                    <button class="btn-edit">Edit Profile</button>
+                </div>
+                <div class="ph-stats">
+                    <div class="ph-stat">
+                        <span class="ph-stat-label">Posts Shared</span>
+                        <span class="ph-stat-val" id="kPosts">0</span>
+                    </div>
+                    <div class="ph-stat">
+                        <span class="ph-stat-label">People Fed</span>
+                        <span class="ph-stat-val" id="kFed">0</span>
+                    </div>
+                    <div class="ph-stat">
+                        <span class="ph-stat-label">Food Saved</span>
+                        <span class="ph-stat-val" id="kSaved">0.0kg</span>
+                    </div>
+                    <div class="ph-stat">
+                        <span class="ph-stat-label">Streak</span>
+                        <span class="ph-stat-val" id="kStreak">0 days</span>
+                    </div>
+                </div>
+            </section>
+
+            <div class="profile-grid">
+                <!-- Left Column -->
+                <div class="pg-left">
+                    <!-- Impact Card -->
+                    <section class="panel impact-card">
+                        <div class="panel-head">
+                            <h3>Your Impact</h3>
+                            <span class="icon">🌍</span>
+                        </div>
+                        <div class="impact-grid">
+                            <div class="impact-item">
+                                <div class="impact-icon">🌿</div>
+                                <div class="impact-data">
+                                    <div class="impact-val" id="impactCO2">0.0 kg</div>
+                                    <div class="impact-label">CO₂ Prevented</div>
+                                </div>
+                            </div>
+                            <div class="impact-item">
+                                <div class="impact-icon">🍱</div>
+                                <div class="impact-data">
+                                    <div class="impact-val" id="impactMeals">0</div>
+                                    <div class="impact-label">Meals Provided</div>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="impact-quote">"Every meal shared is a step towards a sustainable future!"</p>
+                    </section>
+
+                    <!-- Level Progress -->
+                    <section class="panel level-card">
+                        <div class="panel-head">
+                            <h3>Level Progress</h3>
+                            <span class="icon">🌱</span>
+                        </div>
+                        <div class="level-info">
+                            <div class="level-title">Seedling Level 1</div>
+                            <div class="level-pts" id="levelPts">0 total points</div>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-labels">
+                                <span>Progress to Sprout</span>
+                                <span id="levelProgress">0/50 pts</span>
+                            </div>
+                            <div class="progress-track">
+                                <div class="progress-fill" id="levelBar" style="width:0%"></div>
+                            </div>
+                        </div>
+                        <div class="level-tips">
+                            <p>Earn points by:</p>
+                            <ul>
+                                <li>+10 Share food</li>
+                                <li>+20 Successful claim</li>
+                                <li>+5 Claim food</li>
+                            </ul>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right Column -->
+                <div class="pg-right">
+                    <!-- Achievements -->
+                    <section class="panel">
+                        <div class="panel-head">
+                            <h3>Achievements</h3>
+                            <span class="badge-pill" id="achProgress">0/10</span>
+                        </div>
+                        <div class="ach-grid">
+                            <div class="ach-item" title="First Share">🌱</div>
+                            <div class="ach-item" title="Helpful Starter">⭐</div>
+                            <div class="ach-item" title="Eco Warrior">🌿</div>
+                            <div class="ach-item" title="Consistent">📅</div>
+                            <div class="ach-item" title="Generous Soul">💚</div>
+                            <div class="ach-item" title="Community Hero">🏆</div>
+                            <div class="ach-item" title="Mega Saver">💪</div>
+                            <div class="ach-item" title="Dedicated">🔥</div>
+                            <div class="ach-item" title="Food Champion">🥇</div>
+                            <div class="ach-item" title="Legendary">🌟</div>
+                        </div>
+                    </section>
+
+                    <!-- Recent Activity -->
+                    <section class="panel">
+                        <div class="panel-head">
+                            <h3>Recent Activity</h3>
+                        </div>
+                        <div class="activity-list">
+                            <div class="act-item">
+                                <div class="act-icon">📄</div>
+                                <div class="act-details">
+                                    <span class="act-label">Food Posts</span>
+                                    <span class="act-val" id="actPosts">0</span>
+                                </div>
+                            </div>
+                            <div class="act-item">
+                                <div class="act-icon">✅</div>
+                                <div class="act-details">
+                                    <span class="act-label">Successful Requests</span>
+                                    <span class="act-val" id="actClaims">0</span>
+                                </div>
+                            </div>
+                            <div class="act-item">
+                                <div class="act-icon">🍱</div>
+                                <div class="act-details">
+                                    <span class="act-label">Food Requested</span>
+                                    <span class="act-val" id="actClaimed">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { renderProfile, navActivate } from "{{ url_for('static', filename='js/app.js') }}?v=3";
+        window.addEventListener('DOMContentLoaded', () => {
+            renderProfile?.();
+            navActivate?.('profile');
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+</body>
+
+</html>

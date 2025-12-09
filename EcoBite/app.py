@@ -8,25 +8,22 @@ from routes_claims import register_claim_routes
 
 load_dotenv()
 
-UPLOAD_FOLDER = "uploads"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 
 
 def create_app():
     app = Flask(__name__)
 
-    # Secret key from env (Render) or fallback
     app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 
-    # Ensure uploads folder exists
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-    # Register route groups
     register_pages(app)
     register_api_routes(app)
     register_claim_routes(app)
 
-    # Serve uploaded images
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename):
         return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
@@ -34,7 +31,6 @@ def create_app():
     return app
 
 
-# For Render / Gunicorn entry point
 app = create_app()
 
 if __name__ == "__main__":

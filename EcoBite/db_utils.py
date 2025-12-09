@@ -1,3 +1,4 @@
+# db_utils.py
 """
 DB helper functions for EcoBite.
 
@@ -6,28 +7,35 @@ All DB access should go through:
     - conn (global connection)
     - dict_rows()
     - compute_stats()
-so the rest of your code works unchanged.
 
-Uses env vars so it works on Render + Railway + local (.env).
+Uses environment variables so it works on:
+- Local (.env)
+- Render (Environment tab) with Railway MySQL
 """
 
 import os
 import mariadb
 from dotenv import load_dotenv
 
+# Load .env when running locally
 load_dotenv()
 
+# --------- DB CONFIG ---------
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
 DB_PORT = int(os.getenv("DB_PORT", "3306"))
-DB_USER = os.getenv("DB_USER", "ecobite")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "ecobite")
+DB_USER = os.getenv("DB_USER", "root")
+
+# IMPORTANT:
+# - LOCAL: set DB_PASSWORD in .env to your HeidiSQL password (you said: 6969)
+# - RENDER: DB_PASSWORD is set in the Environment tab with your Railway password
+DB_PASSWORD = os.getenv("DB_PASSWORD", "6969")   # fallback only for LOCAL dev
+
 DB_NAME = os.getenv("DB_NAME", "ecobite")
 
-_conn = None
-
+# --------- CONNECTION HELPERS ---------
 
 def get_db_connection():
-    """Create a new MariaDB connection."""
+    """Create and return a new MariaDB connection."""
     return mariadb.connect(
         host=DB_HOST,
         port=DB_PORT,
@@ -37,36 +45,30 @@ def get_db_connection():
     )
 
 
-def get_conn():
-    """Return a reusable global connection."""
-    global _conn
-    if _conn is None:
-        _conn = get_db_connection()
-    return _conn
-
-
-# Global connection used by the rest of the app
-conn = get_conn()
+# We *do* create a global connection – the app expects a global `conn`
+# If credentials are wrong, you'll see an error right at startup.
+conn = get_db_connection()
 
 
 def get_cursor():
     """
-    Return a cursor. If the connection died, reconnect automatically.
+    Return a cursor. If the connection died, try to reconnect once.
     """
     global conn
     try:
-        cur = conn.cursor()
-        return cur
+        return conn.cursor()
     except mariadb.Error:
-        # Reconnect
+        # Try reconnecting one time
         conn = get_db_connection()
         return conn.cursor()
 
 
+# --------- SMALL UTILITIES ---------
+
 def dict_rows(rows, description):
     """
     Convert list of tuples + cursor.description into list of dicts.
-    Like MySQL's DictCursor, but manual.
+    Similar to DictCursor behavior.
     """
     if not rows:
         return []
@@ -83,7 +85,7 @@ def dict_rows(rows, description):
 def compute_stats(user_id=None):
     """
     Compute simple stats either globally or for a specific user.
-    This is not super optimized, but good enough for your project.
+    This matches what your UI expects.
     """
     cur = get_cursor()
     stats = {}
@@ -118,7 +120,6 @@ def compute_stats(user_id=None):
             weight = cur.fetchone()[0]
             stats["food_waste_prevented_kg"] = float(weight) if weight else 0.0
         except Exception:
-            # On any error, just return zeros so UI doesn't crash
             stats.setdefault("available_now", 0)
             stats.setdefault("successfully_shared", 0)
             stats.setdefault("total_posts", 0)
@@ -175,7 +176,6 @@ def compute_stats(user_id=None):
         row = cur.fetchone()
         stats["join_date"] = row[0] if row else None
     except Exception:
-        # If anything fails, don't break UI
         stats.setdefault("posts_created", 0)
         stats.setdefault("posts_shared", 0)
         stats.setdefault("weight_shared_kg", 0.0)

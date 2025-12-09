@@ -2,10 +2,8 @@ Flask==3.0.0
 Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
 
-# Use ONE of these depending on what your app actually imports:
-
-# If your code uses "import mariadb":
-mariadb==1.1.13
+# Use PyMySQL instead of mariadb to avoid Windows DLL issues
+PyMySQL==1.1.1
 
 python-dotenv==1.0.1
 gunicorn==21.2.0

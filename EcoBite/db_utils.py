@@ -1,56 +1,33 @@
-# db_utils.py
 """
-Central database helper functions for EcoBite.
+DB helper functions for EcoBite.
 
-This file is written to be BACKWARDS COMPATIBLE with the rest of your
-project, so these imports still work everywhere:
+All DB access should go through:
+    - get_cursor()
+    - conn (global connection)
+    - dict_rows()
+    - compute_stats()
+so the rest of your code works unchanged.
 
-    from db_utils import get_cursor, dict_rows, compute_stats, conn
-
-as well as:
-
-    from db_utils import get_db_connection
-
-It uses environment variables so it works both on Railway/Render and locally.
+Uses env vars so it works on Render + Railway + local (.env).
 """
 
 import os
 import mariadb
 from dotenv import load_dotenv
 
-# Load .env in local dev; on Render/Railway the env vars are already set
 load_dotenv()
-
-# --- Connection settings (from env) -----------------------------------------
 
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
 DB_PORT = int(os.getenv("DB_PORT", "3306"))
-
-# your local defaults (same as inspect_db.py)
 DB_USER = os.getenv("DB_USER", "ecobite")
-
-DB_PASSWORD = (
-    os.getenv("DB_PASSWORD")
-    or os.getenv("DB_PASS")
-    or "2312093"
-)
-
+DB_PASSWORD = os.getenv("DB_PASSWORD", "ecobite")
 DB_NAME = os.getenv("DB_NAME", "ecobite")
 
-
-
-# internal global connection (used by web app)
 _conn = None
 
 
-# --- Low-level connection helpers -------------------------------------------
-
 def get_db_connection():
-    """
-    Create and return a NEW MariaDB connection.
-
-    Used by scripts like migrate_db.py.
-    """
+    """Create a new MariaDB connection."""
     return mariadb.connect(
         host=DB_HOST,
         port=DB_PORT,
@@ -61,150 +38,150 @@ def get_db_connection():
 
 
 def get_conn():
-    """
-    Return a shared connection object for the web app.
-
-    Recreates the connection if it was never created or if ping() fails.
-    """
+    """Return a reusable global connection."""
     global _conn
     if _conn is None:
-        _conn = get_db_connection()
-        return _conn
-
-    try:
-        # ping() will raise on a dead connection
-        _conn.ping()
-    except mariadb.Error:
         _conn = get_db_connection()
     return _conn
 
 
-# Name expected by existing code: imported as `conn`
+# Global connection used by the rest of the app
 conn = get_conn()
 
 
-def get_cursor(dictionary: bool = False):
+def get_cursor():
     """
-    Return a cursor from the shared connection.
-
-    dictionary=True -> rows are dicts; otherwise rows are tuples.
+    Return a cursor. If the connection died, reconnect automatically.
     """
-    return get_conn().cursor(dictionary=dictionary)
+    global conn
+    try:
+        cur = conn.cursor()
+        return cur
+    except mariadb.Error:
+        # Reconnect
+        conn = get_db_connection()
+        return conn.cursor()
 
 
-# --- Row / dict helpers ------------------------------------------------------
-
-def dict_rows(rows, description=None):
+def dict_rows(rows, description):
     """
-    Convert DB-API rows + cursor.description into a list of dicts.
-
-    * If rows are already dicts (from dictionary cursor), they are returned
-      unchanged.
-    * Otherwise we use cursor.description to build dicts.
-
-    Existing code calls: dict_rows(cur.fetchall(), cur.description)
+    Convert list of tuples + cursor.description into list of dicts.
+    Like MySQL's DictCursor, but manual.
     """
     if not rows:
         return []
-
-    first = rows[0]
-    if isinstance(first, dict):
-        # already dict-style from dictionary cursor
-        return rows
-
-    if description is None:
-        raise ValueError("cursor.description is required when rows are tuples")
-
-    columns = [col[0] for col in description]
+    col_names = [col[0] for col in description]
     out = []
     for row in rows:
-        d = {columns[i]: row[i] for i in range(len(columns))}
+        d = {}
+        for name, value in zip(col_names, row):
+            d[name] = value
         out.append(d)
     return out
 
 
-# --- Simple query helpers (optional, but useful) -----------------------------
-
-def query_one(sql, params=None, *, dict_result: bool = True):
-    """Run a SELECT that returns a single row or None."""
-    cur = get_cursor(dictionary=dict_result)
-    cur.execute(sql, params or ())
-    return cur.fetchone()
-
-
-def query_all(sql, params=None, *, dict_result: bool = True):
-    """Run a SELECT that returns a list of rows."""
-    cur = get_cursor(dictionary=dict_result)
-    cur.execute(sql, params or ())
-    return cur.fetchall()
-
-
-def execute(sql, params=None):
-    """
-    Run an INSERT / UPDATE / DELETE.
-    Returns the last inserted id (if any).
-    """
-    c = get_conn()
-    cur = c.cursor()
-    cur.execute(sql, params or ())
-    c.commit()
-    return cur.lastrowid
-
-
-# --- Stats helper used on home/profile pages ---------------------------------
-
 def compute_stats(user_id=None):
     """
-    Compute simple stats for the dashboard.
-
-    - If user_id is None -> global stats.
-    - If user_id is given -> stats for that user only.
-
-    Returns a dict (missing keys default to 0).
+    Compute simple stats either globally or for a specific user.
+    This is not super optimized, but good enough for your project.
     """
-    stats = {
-        "total_posts": 0,
-        "available_now": 0,
-        "shared": 0,
-        "my_posts": 0,
-        "my_shared": 0,
-    }
-
     cur = get_cursor()
-    try:
-        if user_id is None:
-            # Global stats
+    stats = {}
+
+    if user_id is None:
+        # Global stats
+        try:
+            cur.execute(
+                """
+                SELECT COUNT(*) FROM posts
+                WHERE status='active'
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                """
+            )
+            stats["available_now"] = cur.fetchone()[0]
+
+            cur.execute(
+                "SELECT COUNT(*) FROM posts WHERE status IN ('claimed', 'completed')"
+            )
+            stats["successfully_shared"] = cur.fetchone()[0]
+
             cur.execute("SELECT COUNT(*) FROM posts")
             stats["total_posts"] = cur.fetchone()[0]
 
-            cur.execute("""
-                SELECT COUNT(*)
-                FROM posts
-                WHERE status='active'
-                  AND (expires_at IS NULL OR expires_at > NOW())
-            """)
-            stats["available_now"] = cur.fetchone()[0]
-
-            cur.execute("""
-                SELECT COUNT(*)
+            cur.execute(
+                """
+                SELECT SUM(estimated_weight_kg)
                 FROM posts
                 WHERE status IN ('claimed', 'completed')
-            """)
-            stats["shared"] = cur.fetchone()[0]
-        else:
-            # Per-user stats
-            cur.execute("SELECT COUNT(*) FROM posts WHERE user_id=?", (user_id,))
-            stats["my_posts"] = cur.fetchone()[0]
+                """
+            )
+            weight = cur.fetchone()[0]
+            stats["food_waste_prevented_kg"] = float(weight) if weight else 0.0
+        except Exception:
+            # On any error, just return zeros so UI doesn't crash
+            stats.setdefault("available_now", 0)
+            stats.setdefault("successfully_shared", 0)
+            stats.setdefault("total_posts", 0)
+            stats.setdefault("food_waste_prevented_kg", 0.0)
+        return stats
 
-            cur.execute("""
-                SELECT COUNT(*)
-                FROM posts
-                WHERE user_id=? AND status IN ('claimed', 'completed')
-            """, (user_id,))
-            stats["my_shared"] = cur.fetchone()[0]
+    # Per-user stats
+    try:
+        cur.execute("SELECT COUNT(*) FROM posts WHERE user_id=?", (user_id,))
+        stats["posts_created"] = cur.fetchone()[0]
 
-    except Exception as e:
-        # Don't crash the app just because stats failed
-        print(f"❌ compute_stats error: {e}")
+        cur.execute(
+            """
+            SELECT COUNT(*) FROM posts
+            WHERE user_id=? AND status IN ('claimed', 'completed')
+            """,
+            (user_id,),
+        )
+        stats["posts_shared"] = cur.fetchone()[0]
+
+        cur.execute(
+            """
+            SELECT SUM(estimated_weight_kg)
+            FROM posts
+            WHERE user_id=? AND status IN ('claimed', 'completed')
+            """,
+            (user_id,),
+        )
+        weight = cur.fetchone()[0]
+        stats["weight_shared_kg"] = float(weight) if weight else 0.0
+
+        cur.execute("SELECT COUNT(*) FROM claims WHERE claimer_id=?", (user_id,))
+        stats["claims_made"] = cur.fetchone()[0]
+
+        cur.execute(
+            """
+            SELECT COUNT(*) FROM claims
+            WHERE claimer_id=? AND status='approved'
+            """,
+            (user_id,),
+        )
+        stats["claims_accepted"] = cur.fetchone()[0]
+
+        cur.execute(
+            """
+            SELECT COUNT(*) FROM claims
+            WHERE claimer_id=? AND status='rejected'
+            """,
+            (user_id,),
+        )
+        stats["claims_rejected"] = cur.fetchone()[0]
+
+        cur.execute("SELECT created_at FROM users WHERE id=?", (user_id,))
+        row = cur.fetchone()
+        stats["join_date"] = row[0] if row else None
+    except Exception:
+        # If anything fails, don't break UI
+        stats.setdefault("posts_created", 0)
+        stats.setdefault("posts_shared", 0)
+        stats.setdefault("weight_shared_kg", 0.0)
+        stats.setdefault("claims_made", 0)
+        stats.setdefault("claims_accepted", 0)
+        stats.setdefault("claims_rejected", 0)
+        stats.setdefault("join_date", None)
 
     return stats

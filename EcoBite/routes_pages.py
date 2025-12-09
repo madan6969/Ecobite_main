@@ -1,15 +1,23 @@
-# routes_pages.py
 import json
+import os
 from datetime import datetime, timedelta
 
 from flask import (
-    render_template, request, redirect,
-    url_for, session, flash
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    flash,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 from db_utils import get_cursor, compute_stats, dict_rows, conn
 from auth_utils import require_login, ALLOWED_ROLES
+
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 def register_pages(app):
@@ -43,7 +51,7 @@ def register_pages(app):
         try:
             cur.execute(
                 "SELECT id,email,password_hash,role FROM users WHERE email=?",
-                (email,)
+                (email,),
             )
             row = cur.fetchone()
             if not row or not check_password_hash(row[2], password):
@@ -91,12 +99,15 @@ def register_pages(app):
         try:
             cur.execute("SELECT id FROM users WHERE email=?", (email,))
             if cur.fetchone():
-                flash("Email already exists. Please use a different email or login instead.", "error")
+                flash(
+                    "Email already exists. Please use a different email or login instead.",
+                    "error",
+                )
                 return redirect(url_for("signup"))
 
             cur.execute(
                 "INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)",
-                (name, email, pw_hash, role)
+                (name, email, pw_hash, role),
             )
             conn.commit()
 
@@ -121,23 +132,27 @@ def register_pages(app):
         posts = []
         if cur:
             try:
-                cur.execute("""
-                    SELECT p.id,p.description,p.category,p.quantity,p.status,p.location,
-                           p.expires_at,u.email AS owner_email
+                cur.execute(
+                    """
+                    SELECT p.id,p.description,p.category,p.quantity,p.status,
+                           p.location,p.expires_at,u.email AS owner_email
                     FROM posts p
                     JOIN users u ON p.user_id=u.id
                     WHERE p.status='active'
                       AND (p.expires_at IS NULL OR p.expires_at > NOW())
                     ORDER BY p.created_at DESC
-                """)
+                    """
+                )
                 posts = dict_rows(cur.fetchall(), cur.description)
             except Exception as e:
                 print("❌ Feed error:", e)
                 posts = []
         stats = compute_stats()
-        return render_template("index.html", posts=posts, stats=stats, email=session["email"])
+        return render_template(
+            "index.html", posts=posts, stats=stats, email=session["email"]
+        )
 
-    # --------------- Create Post ----------------
+    # --------------- Create Post (HTML) ----------------
 
     @app.route("/create", methods=["GET", "POST"])
     def create():
@@ -154,6 +169,13 @@ def register_pages(app):
             diets = request.form.getlist("diet")
             dietary_json = json.dumps(diets) if diets else None
 
+            photo = request.files.get("photo")
+            photo_filename = None
+            if photo and photo.filename:
+                filename = secure_filename(photo.filename)
+                photo_filename = f"{session['user_id']}_{filename}"
+                photo.save(os.path.join(UPLOAD_FOLDER, photo_filename))
+
             if not desc or not expiry_str or not location:
                 flash("All required fields must be filled.", "error")
                 return redirect(url_for("create"))
@@ -166,25 +188,33 @@ def register_pages(app):
                         minutes=int(expiry_str) if expiry_str.isdigit() else 60
                     )
 
-                now = datetime.now()
-                delta = expiry_dt - now
-                expiry_minutes = max(1, int(delta.total_seconds() / 60))
-
                 cur = get_cursor()
                 if cur is None:
                     flash("Database connection error. Please try again.", "error")
                     return redirect(url_for("create"))
 
-                cur.execute("""
+                # NOTE: Make sure your 'posts' table has a VARCHAR column named 'photo'
+                # or remove 'photo' from these fields if you don't want to store filenames.
+                cur.execute(
+                    """
                     INSERT INTO posts (
                         user_id,description,category,quantity,
-                        dietary_json,location,expiry_minutes,expires_at,status
+                        dietary_json,location,expires_at,status,photo
                     )
-                    VALUES (?,?,?,?,?,?,?,?,'active')
-                """, (
-                    session["user_id"], desc, category, qty or None,
-                    dietary_json, location, expiry_minutes, expiry_dt
-                ))
+                    VALUES (?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        session["user_id"],
+                        desc,
+                        category,
+                        qty or None,
+                        dietary_json,
+                        location,
+                        expiry_dt,
+                        "active",
+                        photo_filename,
+                    ),
+                )
                 conn.commit()
                 flash("Post shared successfully!", "success")
                 return redirect(url_for("home"))
@@ -213,10 +243,13 @@ def register_pages(app):
             return redirect(url_for("home"))
         posts = []
         try:
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id,description,category,quantity,status,created_at
                 FROM posts WHERE user_id=? ORDER BY created_at DESC
-            """, (session["user_id"],))
+                """,
+                (session["user_id"],),
+            )
             posts = dict_rows(cur.fetchall(), cur.description)
         except Exception as e:
             print("❌ MyPosts error:", e)

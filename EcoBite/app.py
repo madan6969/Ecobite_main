@@ -1,25 +1,34 @@
+# app.py
+
 import os
+from dotenv import load_dotenv
 from flask import Flask
 
+# Our route modules expose register_* functions, not blueprints
 from routes_pages import register_pages
-from routes_claims import register_claim_routes
 from routes_api import register_api_routes
+from routes_claims import register_claim_routes
+
+load_dotenv()
+
 
 def create_app():
-    app = Flask(__name__, template_folder="templates", static_folder="static")
-    app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecret")
+    app = Flask(__name__)
 
-    # Register all route groups
+    # Secret key from env (Render/Railway) or fallback for local dev
+    app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
+
+    # Register all routes on this app
     register_pages(app)
-    register_claim_routes(app)
     register_api_routes(app)
+    register_claim_routes(app)
 
     return app
 
 
+# For Render / Gunicorn entry point
 app = create_app()
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
-
+    # Local dev
+    app.run(debug=True)

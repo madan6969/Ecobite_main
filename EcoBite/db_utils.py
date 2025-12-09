@@ -68,18 +68,30 @@ def get_cursor():
 def dict_rows(rows, description):
     """
     Convert list of tuples + cursor.description into list of dicts.
-    Similar to DictCursor behavior.
+    Also decode any bytes/bytearray columns to UTF-8 strings so
+    `jsonify()` can serialize them.
     """
     if not rows:
         return []
+
     col_names = [col[0] for col in description]
     out = []
+
     for row in rows:
         d = {}
         for name, value in zip(col_names, row):
+            # Decode bytes so they become JSON-serializable
+            if isinstance(value, (bytes, bytearray)):
+                try:
+                    value = value.decode("utf-8")
+                except Exception:
+                    # Fallback if encoding is weird
+                    value = value.decode("latin1", errors="ignore")
             d[name] = value
         out.append(d)
+
     return out
+
 
 
 def compute_stats(user_id=None):

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 import json
+import os
 
 from flask import request, jsonify, session
 
@@ -23,34 +24,70 @@ def register_api_routes(app):
             if "user_id" not in session:
                 return jsonify({"error": "Unauthorized"}), 401
 
-            data = request.get_json() or {}
+            # Check content type: our create page sends multipart/form-data (FormData + file)
+            is_multipart = request.content_type and "multipart/form-data" in request.content_type
 
-            title = (data.get("title") or "").strip()
-            desc = (data.get("description") or "").strip()
-            category = data.get("category") or "Other"
-            quantity = data.get("quantity") or ""
-            weight = data.get("estimated_weight_kg") or 0
-            dietary = data.get("dietary_tags") or []
-            location = (data.get("location_text") or "").strip()
-            pickup_start = data.get("pickup_window_start")
-            pickup_end = data.get("pickup_window_end")
-            expires_at = data.get("expires_at")
+            if is_multipart:
+                form = request.form
+                title = (form.get("title") or "").strip()
+                desc = (form.get("description") or "").strip()
+                category = form.get("category") or "Other"
+                quantity = form.get("qty") or form.get("quantity") or ""
+                location = (form.get("location") or "").strip()
+                expires_at = form.get("expiry_time") or form.get("expires_at")
+                dietary = form.getlist("diet") or []
+                pickup_start = None
+                pickup_end = None
+                weight = 0
+            else:
+                # JSON fallback (not used by your current UI, but kept for safety)
+                data = request.get_json() or {}
+                title = (data.get("title") or "").strip()
+                desc = (data.get("description") or "").strip()
+                category = data.get("category") or "Other"
+                quantity = data.get("quantity") or ""
+                location = (data.get("location_text") or data.get("location") or "").strip()
+                expires_at = data.get("expires_at")
+                dietary = data.get("dietary_tags") or []
+                pickup_start = data.get("pickup_window_start")
+                pickup_end = data.get("pickup_window_end")
+                weight = data.get("estimated_weight_kg") or 0
 
             if not title or not desc or not location or not expires_at:
                 return jsonify({"error": "Missing required fields"}), 400
 
-            try:
-                dietary_json = json.dumps(dietary)
+            # ---- handle image upload ----
+            image_url = None
+            image_file = request.files.get("photo") or request.files.get("image")
+            if image_file and image_file.filename:
+                try:
+                    import os
+                    from time import time
 
+                    ext = os.path.splitext(image_file.filename)[1].lower()
+                    if ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]:
+                        filename = f"{session['user_id']}_{int(time())}{ext}"
+                        upload_dir = os.path.join(app.static_folder, "uploads")
+                        os.makedirs(upload_dir, exist_ok=True)
+                        file_path = os.path.join(upload_dir, filename)
+                        image_file.save(file_path)
+                        # URL that the browser can load
+                        image_url = f"/static/uploads/{filename}"
+                except Exception as e:
+                    print("❌ Image upload error:", e)
+
+            dietary_json = json.dumps(dietary)
+
+            try:
                 cur.execute(
                     """
                     INSERT INTO posts (
                         user_id, title, description, category, quantity,
                         estimated_weight_kg, dietary_json, location,
                         pickup_window_start, pickup_window_end, expires_at,
-                        status, created_at
+                        status, image_url, created_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NOW())
                     """,
                     (
                         session["user_id"],
@@ -64,12 +101,12 @@ def register_api_routes(app):
                         pickup_start,
                         pickup_end,
                         expires_at,
+                        image_url,
                     ),
                 )
                 conn.commit()
                 post_id = cur.lastrowid
 
-                # 🔑 Important: return a *pure Python dict* instead of DB row
                 new_post = {
                     "id": post_id,
                     "user_id": session["user_id"],
@@ -78,7 +115,7 @@ def register_api_routes(app):
                     "category": category,
                     "quantity": quantity,
                     "estimated_weight_kg": weight,
-                    "dietary_json": dietary,
+                    "dietary_json": dietary_json,
                     "location": location,
                     "pickup_window_start": pickup_start,
                     "pickup_window_end": pickup_end,
@@ -86,6 +123,7 @@ def register_api_routes(app):
                     "status": "active",
                     "owner_email": session.get("email"),
                     "ownerEmail": session.get("email"),
+                    "image_url": image_url,
                 }
                 return jsonify(new_post), 201
 
@@ -93,6 +131,64 @@ def register_api_routes(app):
                 print(f"❌ API Create Post Error: {e}")
                 conn.rollback()
                 return jsonify({"error": str(e)}), 500
+
+        # ---------- LIST POSTS (keep your existing code here) ----------
+        #  ... (do not change the rest of api_food_posts)
+
+
+        # ---------- LIST POSTS ----------
+        try:
+            status_filter = request.args.get("status", "available")
+            search = (request.args.get("search") or "").strip()
+            cat_filter = request.args.get("type", "All Types")
+            diet_filter = request.args.get("dietary", "")
+            sort_order = request.args.get("sort", "newest")
+
+            query = """
+                SELECT p.*, u.email AS owner_email
+                FROM posts p
+                JOIN users u ON p.user_id = u.id
+                WHERE 1=1
+            """
+            params = []
+
+            if status_filter == "available":
+                query += " AND p.status='active' AND (p.expires_at IS NULL OR p.expires_at > NOW())"
+            elif status_filter == "claimed":
+                query += " AND p.status='claimed'"
+            elif status_filter == "expired":
+                query += " AND (p.status='expired' OR p.expires_at <= NOW())"
+
+            if search:
+                query += " AND (p.title LIKE ? OR p.description LIKE ?)"
+                params.extend([f"%{search}%", f"%{search}%"])
+
+            if cat_filter and cat_filter != "All Types":
+                query += " AND p.category = ?"
+                params.append(cat_filter)
+
+            if diet_filter:
+                query += " AND p.dietary_json LIKE ?"
+                params.append(f"%{diet_filter}%")
+
+            if sort_order == "endingSoon":
+                query += " ORDER BY p.expires_at ASC"
+            else:
+                query += " ORDER BY p.created_at DESC"
+
+            cur.execute(query, tuple(params))
+            posts = dict_rows(cur.fetchall(), cur.description)
+
+            for p in posts:
+                if "owner_email" in p:
+                    p["ownerEmail"] = p["owner_email"]
+
+            return jsonify(posts)
+
+        except Exception as e:
+            print(f"❌ API List Posts Error: {e}")
+            return jsonify({"error": str(e)}), 500
+
 
         # ---------- LIST POSTS ----------
         try:

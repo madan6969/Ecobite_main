@@ -1,16 +1,33 @@
-from flask import session
+# auth_utils.py
 
-# Same roles as before
-ALLOWED_ROLES = {"user", "business", "admin"}
+from functools import wraps
+from flask import session, redirect, url_for, flash
 
-def require_login():
+# Roles your site uses
+ALLOWED_ROLES = {"user", "admin"}
+
+
+def require_login(role=None):
     """
-    Your current 'fake' login logic: if not logged in,
-    set a default demo user.
+    For HTML views:
+        need = require_login()
+        if need: return need
+
+    For API views:
+        need = require_login()
+        if need: return jsonify(...), 401  (they ignore the redirect and use JSON)
     """
-    # If you ever want real login, just restore the old version here.
     if "user_id" not in session:
-        session["user_id"] = 1
-        session["email"] = "student@campus.edu"
-        session["role"] = "user"
+        # Not logged in
+        flash("Please log in first.", "error")
+        return redirect(url_for("login"))
+
+    if role:
+        allowed = {role} if isinstance(role, str) else set(role)
+        user_role = session.get("role", "user")
+        if user_role not in allowed:
+            flash("You are not allowed to access this page.", "error")
+            return redirect(url_for("home"))
+
+    # Logged in and allowed
     return None

@@ -1,4 +1,3 @@
-
 // API Client connecting to Flask Backend
 
 const API_BASE = '/api';
@@ -22,16 +21,32 @@ export async function listPosts(params = {}) {
   return await res.json();
 }
 
+/* ---------- FIXED createPost ---------- */
 export async function createPost(data) {
+  const isFormData = data instanceof FormData;
+
   const res = await fetch(`${API_BASE}/food-posts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
+    // For FormData: let the browser set the multipart boundary automatically
+    headers: isFormData ? undefined : { 'Content-Type': 'application/json' },
+    body: isFormData ? data : JSON.stringify(data)
   });
+
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || 'Failed to create post');
+    let msg = 'Failed to create post';
+    try {
+      const err = await res.json();
+      if (err && err.error) msg = err.error;
+    } catch (e) {
+      // Response was not JSON (e.g. HTML traceback), fall back to raw text
+      try {
+        const text = await res.text();
+        msg = text.slice(0, 200); // just a short preview
+      } catch { /* ignore */ }
+    }
+    throw new Error(msg);
   }
+
   return await res.json();
 }
 
@@ -75,12 +90,6 @@ export async function computeStats() {
   // Actually, to get total stats we might need more data or a dedicated endpoint.
   // But let's try to get all posts if possible, or just use what we have.
   // The API listPosts filters by status if provided.
-  // Let's fetch "all" for stats if we want accurate total counts, 
-  // but the UI might only need available for the feed.
-  // However, the stats bar needs "Total Posts", "Successfully Shared".
-
-  // Let's fetch all posts without status filter to compute stats?
-  // The API default status is 'available'. We need to pass something to get all?
   // The API code: if status_filter == "available" ... elif "claimed" ...
   // It doesn't seem to have an "all" option easily without modification or multiple requests.
   // Let's make multiple requests in parallel for now.

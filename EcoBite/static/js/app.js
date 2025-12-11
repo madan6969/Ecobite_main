@@ -47,7 +47,6 @@ export async function renderFeed() {
   initCustomDropdowns();
   await draw();
 
-
   async function draw() {
     // Fetch global stats
     try {
@@ -62,7 +61,12 @@ export async function renderFeed() {
     } catch (e) { console.error("Stats error", e); }
 
     const q = (val('search') || '').toLowerCase();
-    const type = val('type') || 'all';
+
+    // ---- FIX for "All Types" ----
+    const rawType = val('type') || 'all';
+    const type = (rawType === 'all' || rawType === 'All Types') ? '' : rawType;
+    // -----------------------------
+
     const scope = state.scope;
     const sort = val('sort') || 'newest';
 
@@ -82,8 +86,6 @@ export async function renderFeed() {
     const feed = byId('feed');
     feed.innerHTML = '';
     items.forEach(p => {
-      // Logic for request button: if not owner and available
-      // API returns owner_email. We check against current user email.
       const user = getUser();
       const isOwner = p.owner_email === user.email;
       const isAvailable = p.status === 'active';
@@ -146,7 +148,6 @@ export function bindCreate() {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
-      // Ensure date is in correct format if needed, but FormData handles file automatically
 
       try {
         await createPost(fd);
@@ -359,12 +360,11 @@ export async function renderRequests() {
       incoming.forEach(c => {
         const p = {
           title: c.post_title,
-          location: 'My Post', // Or fetch post details if needed
-          expires_at: null, // Not critical here
-          ownerEmail: user.email, // I am the owner
+          location: 'My Post',
+          expires_at: null,
+          ownerEmail: user.email,
           status: c.status
         };
-        // Custom card content for incoming request
         const item = document.createElement('div');
         item.className = 'card';
         item.innerHTML = `
@@ -444,7 +444,12 @@ export async function renderProfile() {
       set('#kPosts', stats.posts_created);
       set('#kFed', stats.posts_shared);
       set('#kSaved', `${stats.weight_shared_kg.toFixed(1)}kg`);
-      set('#kStreak', stats.join_date ? `${Math.floor((new Date() - new Date(stats.join_date)) / (1000 * 60 * 60 * 24))} days` : '0 days');
+      set(
+        '#kStreak',
+        stats.join_date
+          ? `${Math.floor((new Date() - new Date(stats.join_date)) / (1000 * 60 * 60 * 24))} days`
+          : '0 days'
+      );
 
       set('#impactCO2', `${stats.weight_shared_kg.toFixed(1)} kg`);
       set('#impactMeals', stats.posts_shared);
@@ -462,7 +467,6 @@ export async function renderProfile() {
       const achProgress = Math.min(10, Math.floor(stats.posts_created / 3) + Math.floor(stats.posts_shared / 2));
       set('#achProgress', `${achProgress}/10`);
 
-      // Update Achievements UI
       const achievements = [
         { id: 'first_share', title: 'First Share', icon: '🌱', unlocked: stats.posts_created >= 1 },
         { id: 'helpful', title: 'Helpful Starter', icon: '⭐', unlocked: stats.posts_created >= 5 },
@@ -494,7 +498,6 @@ function card(p, opts = {}) {
   const root = tag('div', 'card');
   console.log('Rendering card for:', p.title, 'Image URL:', p.image_url, 'Type:', typeof p.image_url, 'Truthy:', !!p.image_url);
 
-  // Image or Thumb
   if (p.image_url) {
     const wrapper = tag('div', 'thumb');
     wrapper.style.padding = '0';
@@ -537,7 +540,7 @@ function set(sel, v) { const el = byId(sel.slice(1)); if (el) el.textContent = v
 function val(id) { const el = byId(id); return el ? el.value : ''; }
 function byId(id) { return document.getElementById(id); }
 function singular(s) { return s.replace(/s$/, ''); }
-function formatDT(iso) { try { return new Date(iso).toLocaleString() } catch { return iso } }
+function formatDT(iso) { try { return new Date(iso).toLocaleString() } catch { return iso; } }
 function isExpired(iso) { return new Date(iso) < new Date(); }
 function timeUntil(iso) {
   const diff = new Date(iso) - new Date();

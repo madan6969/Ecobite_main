@@ -1568,6 +1568,7 @@ body.landing-page {
 
 .hero-title span {
   background: linear-gradient(135deg, #16a34a, #15803d);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -1815,4 +1816,45 @@ body.landing-page {
     height: 100%;
     object-fit: cover;
     border-radius: 12px;
+}
+/* Container so popup is positioned relative to the button */
+.diet-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* The small floating panel */
+.diet-popup {
+  position: absolute;
+  top: 110%;           /* a bit below the button */
+  right: 0;
+  min-width: 220px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 52, 96, 0.15);
+  padding: 16px 18px;
+  z-index: 1000;
+  border: 1px solid rgba(0,0,0,0.04);
+}
+
+.diet-popup h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2933;
+}
+
+.diet-popup ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.diet-popup li {
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.diet-popup input[type="checkbox"] {
+  margin-right: 6px;
 }

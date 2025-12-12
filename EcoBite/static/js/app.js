@@ -1,4 +1,4 @@
-import { listPosts, createPost, claimPost, approveClaim, rejectClaim, computeStats, getUser } from './api.js';
+import { listPosts, createPost, claimPost, approveClaim, rejectClaim, computeStats, getUser, deletePost } from './api.js';
 
 /* ---------- Sidebar highlighting + user badge ---------- */
 export function navActivate(key) {
@@ -260,6 +260,7 @@ export async function renderMyPosts() {
       <div class="mp-header">
         <h4>${p.title || p.description || 'Untitled Post'}</h4>
         ${requestBadge}
+        <button class="btn-sm" style="margin-left:auto" onclick="window.deleteMyPost('${p.id}')">Delete</button>
       </div>
       <div class="mp-body">
         <div class="mp-info">
@@ -321,6 +322,18 @@ export async function renderMyPosts() {
 
   window.handleApprove = (pid, cid) => approveClaim(pid, cid).then(() => renderMyPosts());
   window.handleReject = (pid, cid) => rejectClaim(pid, cid).then(() => renderMyPosts());
+  window.deleteMyPost = (postId) => deleteMyPost(postId);
+}
+
+async function deleteMyPost(postId) {
+  if (!confirm("Delete this post permanently?")) return;
+  try {
+    await deletePost(postId);
+    alert("Post deleted!");
+    renderMyPosts();
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 async function fetchAndGroupClaims() {
@@ -555,3 +568,27 @@ function hydrateUserOnSidebar() {
   });
   w.observe(document.body, { subtree: true, childList: true });
 }
+// EcoBite/static/js/api.js
+// ---- Mobile sidebar toggle (works on all pages) ----
+function bindMobileSidebarToggle() {
+  const btn = document.getElementById('menuBtn');
+  const overlay = document.getElementById('sidebarOverlay');
+
+  if (btn) {
+    btn.addEventListener('click', () => {
+      document.body.classList.toggle('sidebar-open');
+    });
+  }
+  if (overlay) {
+    overlay.addEventListener('click', () => {
+      document.body.classList.remove('sidebar-open');
+    });
+  }
+
+  // Close menu when clicking any sidebar link (optional but nice)
+  document.querySelectorAll('.sidebar a').forEach(a => {
+    a.addEventListener('click', () => document.body.classList.remove('sidebar-open'));
+  });
+}
+
+window.addEventListener('DOMContentLoaded', bindMobileSidebarToggle);

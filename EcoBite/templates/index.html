@@ -10,11 +10,19 @@
 </head>
 
 <body>
+
+  <!-- MOBILE SIDEBAR OVERLAY -->
+  <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
   <div class="app">
     {% include 'shared-sidebar.html' %}
 
     <main>
+
+      <!-- HEADER -->
       <div class="header">
+      
+
         <div>
           <h2>✨ Food Feed</h2>
           <p>Discover and share free food with your campus community 🌍</p>
@@ -68,6 +76,7 @@
         </div>
 
         <div class="filters-row">
+
           <!-- Type Dropdown -->
           <div class="custom-select" id="typeDropdown">
             <button class="select-trigger">
@@ -110,47 +119,27 @@
             </select>
           </div>
 
-          <!-- Dietary button + popup wrapped together -->
+          <!-- Dietary -->
           <div class="diet-wrapper">
             <button class="chip" id="dietBtn">🥒 Dietary</button>
             <div id="dietPopup" class="diet-popup" style="display:none">
               <strong>Dietary Preferences</strong>
               <div class="checks" style="margin-top:12px; flex-direction:column; gap:8px">
-                <label class="chk">
-                  <input type="checkbox" name="dietFilter" value="Vegetarian" />
-                  <span>🥬 Vegetarian</span>
-                </label>
-                <label class="chk">
-                  <input type="checkbox" name="dietFilter" value="Vegan" />
-                  <span>🌱 Vegan</span>
-                </label>
-                <label class="chk">
-                  <input type="checkbox" name="dietFilter" value="Gluten-Free" />
-                  <span>🌾 Gluten-Free</span>
-                </label>
-                <label class="chk">
-                  <input type="checkbox" name="dietFilter" value="Dairy-Free" />
-                  <span>🥛 Dairy-Free</span>
-                </label>
-                <label class="chk">
-                  <input type="checkbox" name="dietFilter" value="Nut-Free" />
-                  <span>🥜 Nut-Free</span>
-                </label>
-                <label class="chk">
-                  <input type="checkbox" name="dietFilter" value="Halal" />
-                  <span>🌙 Halal</span>
-                </label>
-                <label class="chk">
-                  <input type="checkbox" name="dietFilter" value="Kosher" />
-                  <span>✡️ Kosher</span>
-                </label>
+                <label class="chk"><input type="checkbox" value="Vegetarian"> <span>🥬 Vegetarian</span></label>
+                <label class="chk"><input type="checkbox" value="Vegan"> <span>🌱 Vegan</span></label>
+                <label class="chk"><input type="checkbox" value="Gluten-Free"> <span>🌾 Gluten-Free</span></label>
+                <label class="chk"><input type="checkbox" value="Dairy-Free"> <span>🥛 Dairy-Free</span></label>
+                <label class="chk"><input type="checkbox" value="Nut-Free"> <span>🥜 Nut-Free</span></label>
+                <label class="chk"><input type="checkbox" value="Halal"> <span>🌙 Halal</span></label>
+                <label class="chk"><input type="checkbox" value="Kosher"> <span>✡️ Kosher</span></label>
               </div>
             </div>
           </div>
+
         </div>
       </div>
 
-      <!-- Feed grid -->
+      <!-- Feed -->
       <section id="feed" class="grid"></section>
 
       <div class="empty" id="emptyFeed" style="display:none">
@@ -158,19 +147,36 @@
         <h3>No posts yet</h3>
         <p>Be the first to share food and reduce waste!</p>
       </div>
+
     </main>
   </div>
 
-  <!-- Import your module from /static correctly -->
+  <!-- APP LOGIC -->
   <script type="module">
     import { renderFeed, navActivate } from "{{ url_for('static', filename='js/app.js') }}";
+
     window.addEventListener('DOMContentLoaded', () => {
-      // If renderFeed populates from API/localStorage, let it run:
       renderFeed?.();
       navActivate?.('home');
     });
-  </script>
-  <script src="{{ url_for('static', filename='js/api.js') }}"></script>
-</body>
 
+    // MOBILE SIDEBAR TOGGLE
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const btn = document.getElementById('menuBtn');
+
+    btn?.addEventListener('click', () => {
+      sidebar?.classList.add('open');
+      overlay?.classList.add('show');
+    });
+
+    overlay?.addEventListener('click', () => {
+      sidebar?.classList.remove('open');
+      overlay?.classList.remove('show');
+    });
+  </script>
+
+  <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+
+</body>
 </html>

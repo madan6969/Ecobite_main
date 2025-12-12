@@ -330,6 +330,36 @@ def register_api_routes(app):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    # ---------- DELETE POST ----------
+    @app.delete("/api/food-posts/<int:id>")
+    def api_delete_post(id):
+        need = require_login()
+        if need:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        cur = get_cursor()
+        if not cur:
+            return jsonify({"error": "Database error"}), 500
+
+        try:
+            cur.execute("SELECT user_id FROM posts WHERE id=?", (id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Post not found"}), 404
+            if row[0] != session["user_id"]:
+                return jsonify({"error": "Forbidden"}), 403
+
+            # Delete related claims first (safe if no FK / works even if FK exists)
+            cur.execute("DELETE FROM claims WHERE post_id=?", (id,))
+            # Delete the post
+            cur.execute("DELETE FROM posts WHERE id=?", (id,))
+
+            conn.commit()
+            return jsonify({"success": True})
+        except Exception as e:
+            conn.rollback()
+            return jsonify({"error": str(e)}), 500
+
     # ---------- UPDATE POST STATUS ----------
     @app.patch("/api/food-posts/<int:id>/status")
     def api_update_post_status(id):

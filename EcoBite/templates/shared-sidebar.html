@@ -1,3 +1,16 @@
+<!-- ===== Mobile Top Bar (VISIBLE ON ALL PAGES) ===== -->
+<div class="mobile-topbar">
+  <button class="hamburger" id="menuBtn" aria-label="Open menu">☰</button>
+  <div class="brand-inline">
+    <div class="logo">🌿</div>
+    <span class="brand-name">EcoBite</span>
+  </div>
+</div>
+
+<!-- Overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ===== Sidebar ===== -->
 <aside class="sidebar-wrap sidebar">
   <!-- ===== Brand Section ===== -->
   <div class="brand">
@@ -14,7 +27,6 @@
     <a href="{{ url_for('create') }}" data-nav="create">🍱 Share Food</a>
     <a href="{{ url_for('myposts') }}" data-nav="myposts">📦 My Posts</a>
     <a href="{{ url_for('requests_page') }}" data-nav="requests">📬 My Requests</a>
-
     <a href="{{ url_for('profile') }}" data-nav="profile">👤 Profile</a>
   </nav>
 
@@ -34,10 +46,12 @@
         {{ session.get('email', 'G')[0] | upper }}
       </div>
       <div style="font-size:13px; flex:1">
-        <strong id="sbUser" style="display:block; color:var(--text)">{{ session.get('email', 'Guest').split('@')[0] |
-          capitalize }}</strong>
-        <span class="muted" style="color:#6a7b6a; font-size:12px" id="sbEmail">{{ session.get('email',
-          'guest@example.com') }}</span>
+        <strong id="sbUser" style="display:block; color:var(--text)">
+          {{ session.get('email', 'Guest').split('@')[0] | capitalize }}
+        </strong>
+        <span class="muted" style="color:#6a7b6a; font-size:12px" id="sbEmail">
+          {{ session.get('email', 'guest@example.com') }}
+        </span>
       </div>
     </div>
 

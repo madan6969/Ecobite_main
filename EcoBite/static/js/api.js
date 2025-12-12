@@ -83,6 +83,28 @@ export async function rejectClaim(postId, claimId) {
   return await res.json();
 }
 
+export async function deletePost(postId) {
+  const res = await fetch(`${API_BASE}/food-posts/${postId}`, {
+    method: 'DELETE'
+  });
+
+  if (!res.ok) {
+    let msg = 'Failed to delete post';
+    try {
+      const err = await res.json();
+      if (err && err.error) msg = err.error;
+    } catch (e) {
+      try {
+        const text = await res.text();
+        msg = text.slice(0, 200);
+      } catch { /* ignore */ }
+    }
+    throw new Error(msg);
+  }
+
+  return await res.json();
+}
+
 export async function computeStats() {
   // Fetch all posts to compute stats client-side or use a stats endpoint if available.
   // For now, we'll fetch all posts to match previous behavior.

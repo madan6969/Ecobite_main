@@ -1,7 +1,7 @@
 Flask==3.0.0
 Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
-
+pip freeze
 # Use ONE of these depending on what your app actually imports:
 
 # If your code uses "import mariadb":

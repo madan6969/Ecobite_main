@@ -9,6 +9,12 @@ from flask import request, jsonify, session
 from db_utils import get_cursor, dict_rows, conn
 from auth_utils import require_login
 
+import cloudinary
+import cloudinary.uploader
+
+# Use CLOUDINARY_URL from environment (Render env var). This line ensures HTTPS URLs.
+cloudinary.config(secure=True)
+
 
 def register_api_routes(app):
     # ---------- FOOD POSTS LIST + CREATE ----------
@@ -56,25 +62,21 @@ def register_api_routes(app):
             if not title or not desc or not location or not expires_at:
                 return jsonify({"error": "Missing required fields"}), 400
 
-            # ---- handle image upload ----
+            # ---- handle image upload (Cloudinary) ----
             image_url = None
             image_file = request.files.get("photo") or request.files.get("image")
             if image_file and image_file.filename:
                 try:
-                    import os
-                    from time import time
-
                     ext = os.path.splitext(image_file.filename)[1].lower()
                     if ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]:
-                        filename = f"{session['user_id']}_{int(time())}{ext}"
-                        upload_dir = os.path.join(app.static_folder, "uploads")
-                        os.makedirs(upload_dir, exist_ok=True)
-                        file_path = os.path.join(upload_dir, filename)
-                        image_file.save(file_path)
-                        # URL that the browser can load
-                        image_url = f"/static/uploads/{filename}"
+                        uploaded = cloudinary.uploader.upload(
+                            image_file,
+                            folder="ecobite_uploads",
+                            resource_type="image"
+                        )
+                        image_url = uploaded.get("secure_url")
                 except Exception as e:
-                    print("❌ Image upload error:", e)
+                    print("❌ Cloudinary upload error:", e)
 
             dietary_json = json.dumps(dietary)
 

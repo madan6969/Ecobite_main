@@ -87,7 +87,12 @@ export async function renderFeed() {
     feed.innerHTML = '';
     items.forEach(p => {
       const user = getUser();
-      const isOwner = p.owner_email === user.email;
+
+      // ✅ FIX: support both owner_email and ownerEmail, and normalize
+      const userEmail = (user.email || '').trim().toLowerCase();
+      const ownerEmail = (p.owner_email || p.ownerEmail || '').trim().toLowerCase();
+      const isOwner = ownerEmail && ownerEmail === userEmail;
+
       const isAvailable = p.status === 'active';
 
       feed.appendChild(card(p, {
